@@ -1,0 +1,14 @@
+[project]
+name = "ginder"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "beautifulsoup4>=4.14.3",
+    "japanmap>=0.6.0",
+    "matplotlib>=3.10.9",
+    "requests>=2.33.1",
+    "scipy>=1.17.1",
+    "shapely>=2.1.2",
+]
