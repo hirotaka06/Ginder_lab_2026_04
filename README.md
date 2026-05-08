@@ -1,6 +1,9 @@
 # ginder
 
-日本全国の観測データをボロノイ図として可視化するツールだよ。
+日本全国の観測データをボロノイ図として可視化するツール。
+時系列データには GIF / MP4 アニメーションの生成にも対応している。
+
+---
 
 ## セットアップ
 
@@ -8,87 +11,215 @@
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-インストール後、ターミナルを再起動するか以下を実行してパスを反映します。
-
-```bash
-source ~/.zshrc
-```
-
-インストール確認:
-
-```bash
-uv --version
+source ~/.zshrc   # パスを反映
+uv --version      # 確認
 ```
 
 ### 2. 依存パッケージのインストール
-
-リポジトリのルートで実行します。
 
 ```bash
 uv sync
 ```
 
-## 実行方法
+### 3. ffmpeg（MP4 出力に必要）
 
 ```bash
-uv run python main.py <CSVファイルパス> [値の列名]
+brew install ffmpeg
 ```
 
-| 引数 | 必須 | 説明 |
-|------|------|------|
-| `<CSVファイルパス>` | ✅ | 読み込む CSV ファイルのパス |
-| `[値の列名]` | ❌ | 色に使う列名（省略すると `pollen_level`） |
+---
 
-### 実行例
+## 使い方
+
+### 基本：ボロノイ図を1枚生成
 
 ```bash
-uv run python main.py pollen_mock.csv pollen_level
+uv run python main.py <データセット名> <値の列名>
 ```
 
-生成された画像は `output/` フォルダに保存されます。
+| 引数 | 説明 |
+|------|------|
+| `<データセット名>` | `data/` 内のディレクトリ名 |
+| `<値の列名>` | CSV の中で色に使う列名 |
 
-## CSV フォーマット
+```bash
+# 花粉（全国）
+uv run python main.py pollen pollen_level
 
-ヘッダー行が必須です。
+# 福島県の空間線量率（2011年4月）
+uv run python main.py fukushima 2011_04 --prefecture 福島県
+```
+
+生成画像は `output/` に保存されます。
+
+---
+
+### オプション：観測点の丸印・ラベルの表示切り替え
+
+`--no-points` と `--no-labels` で丸印・ラベルをそれぞれ非表示にできます。
+
+| オプション | 効果 |
+|-----------|------|
+| （デフォルト） | 丸印・ラベル両方表示 |
+| `--no-labels` | ラベルだけ非表示 |
+| `--no-points` | 丸印だけ非表示 |
+| `--no-points --no-labels` | 両方非表示（ボロノイ面のみ） |
+
+```bash
+# ラベルなし
+uv run python main.py fukushima 2011_04 --prefecture 福島県 --no-labels
+
+# 丸印・ラベルともに非表示
+uv run python main.py fukushima 2011_04 --prefecture 福島県 --no-points --no-labels
+```
+
+動画生成スクリプトでも同じオプションが使えます。
+
+```bash
+uv run python scripts/generate_voronoi_video.py fukushima --prefecture 福島県 --no-points --no-labels
+```
+
+---
+
+### オプション：都道府県に絞り込む
+
+`--prefecture`（`-p`）を付けると、指定した都道府県内の観測点だけで描画します。
+
+```bash
+uv run python main.py radioactivity radioactivity --prefecture 茨城県
+uv run python main.py fukushima 2011_04 --prefecture 福島県
+```
+
+---
+
+### 時系列：ボロノイ動画を生成（GIF / MP4）
+
+時系列データ（列名が `YYYY_MM` 形式の対応幅 CSV）から動画を生成します。
+
+```bash
+uv run python scripts/generate_voronoi_video.py <データセット名> [オプション]
+```
+
+| オプション | デフォルト | 説明 |
+|-----------|-----------|------|
+| `--prefecture`, `-p` | なし | 都道府県に絞り込む |
+| `--output`, `-o` | 自動命名 | 出力ファイルパス（`.gif` または `.mp4`） |
+| `--fps` | `1.0` | フレームレート（フレーム/秒） |
+
+```bash
+# GIF（デフォルト）
+uv run python scripts/generate_voronoi_video.py fukushima --prefecture 福島県
+
+# MP4（ffmpeg が必要）
+uv run python scripts/generate_voronoi_video.py fukushima --prefecture 福島県 \
+  --output output/fukushima/mp4/fukushima.mp4 --fps 2
+```
+
+出力先：
 
 ```
-name,lat,lon,pollen_level
-東京,35.69,139.69,3.82
-大阪,34.69,135.50,2.10
-...
+output/<データセット名>/
+├── png/            ← 各コマの PNG（YYYY_MM.png）
+├── gif/            ← GIF アニメーション
+└── mp4/            ← MP4 動画
 ```
 
-## 設定
+---
 
-`config/settings.py` で出力先フォルダを変更できます。
+## データセット
 
-```python
-# デフォルト: プロジェクトルート直下の output/
-OUTPUT_DIR: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "output"))
+### `data/pollen/` — 花粉飛散量
 
-# 任意のパスに変更する場合
-# OUTPUT_DIR: str = "/Users/yourname/Desktop/voronoi_images"
+全国の花粉観測データ。
+
+```bash
+uv run python main.py pollen pollen_level
 ```
+
+### `data/fukushima/` — 福島県 空間線量率（2011年3月〜2012年3月）
+
+福島県公式サイトの月次モニタリングデータ（93観測ポスト）。
+時系列動画の生成に対応しています。
+
+```bash
+# 単月のボロノイ図
+uv run python main.py fukushima 2011_04 --prefecture 福島県
+
+# 時系列動画（GIF）
+uv run python scripts/generate_voronoi_video.py fukushima --prefecture 福島県
+
+# 時系列動画（MP4）
+uv run python scripts/generate_voronoi_video.py fukushima --prefecture 福島県 \
+  --output output/fukushima/mp4/fukushima.mp4 --fps 2
+```
+
+**フォーマッター（初回のみ実行）：**
+
+```bash
+# data/fukushima/format/formatter.ipynb を Jupyter で開いて実行
+# → 福島県サイトから CSV を自動ダウンロード・ジオコーディング・CSV 生成
+```
+
+---
+
+## 独自データセットの追加方法
+
+1. `data/<名前>/` ディレクトリを作成
+2. 以下の形式で CSV を配置
+
+   ```
+   name,lat,lon,<値の列名>
+   東京,35.69,139.69,3.82
+   大阪,34.69,135.50,2.10
+   ```
+
+3. `data/<名前>/config.py` を作成
+
+   ```python
+   from datetime import datetime
+   _today = datetime.now().strftime("%Y年%m月%d日")
+
+   title = f"タイトル\n{_today}"
+   colorbar_label = "単位"
+   cmap_name = "YlOrRd"        # matplotlib のカラーマップ名
+   reverse_colors = False
+   thresholds = [
+       (0.0, "低"),
+       (5.0, "中"),
+       (10.0, "高"),
+   ]
+   ```
+
+4. 実行
+
+   ```bash
+   uv run python main.py <名前> <値の列名>
+   ```
+
+---
 
 ## ディレクトリ構成
 
 ```
 ginder/
-├── main.py                  # エントリーポイント
-├── config/
-│   └── settings.py          # 出力先などの設定
-├── domain/
-│   ├── models.py            # エンティティ（StationRecord）
-│   └── interfaces.py        # 抽象インターフェース（DataLoader）
-├── usecase/
-│   └── visualize.py         # ユースケース（run_visualization）
-├── infrastructure/
-│   ├── geo_loader.py        # GeoJSON 読み込み・境界構築
-│   └── csv_loader.py        # CSV からのデータ読み込み
-├── presentation/
-│   ├── voronoi.py           # ボロノイセル計算
-│   └── plot.py              # matplotlib による描画
-└── output/                  # 生成画像の保存先（自動作成）
+├── main.py                          # エントリーポイント（単枚生成）
+├── scripts/
+│   └── generate_voronoi_video.py    # 時系列動画生成スクリプト
+├── data/
+│   ├── pollen/                      # 花粉データセット
+│   ├── radioactivity*/              # 放射能データセット（核種別）
+│   └── fukushima/                   # 福島県時系列データセット
+│       ├── fukushima.csv            # 対応幅 CSV（93ポスト × 13ヶ月）
+│       ├── config.py
+│       └── format/                  # 生データ・フォーマッター
+├── output/
+│   └── fukushima/
+│       ├── png/                     # 各コマ PNG
+│       ├── gif/                     # GIF アニメーション
+│       └── mp4/                     # MP4 動画
+├── domain/                          # ドメインモデル・インターフェース
+├── application/                     # ユースケース・コマンド
+├── adapters/                        # CSV・GeoJSON リポジトリ実装
+├── infrastructure/                  # 設定読み込み・DI コンテナ
+└── japan.geojson                    # 日本の県境データ
 ```
