@@ -36,18 +36,42 @@ plt.rcParams["font.family"] = ["Hiragino Sans", "AppleGothic", "sans-serif"]
 # ── ヘルパー ───────────────────────────────────────────────────────────────
 
 def detect_period_columns(df: pd.DataFrame) -> list[str]:
-    """DataFrame から時系列を表す列名（YYYY_MM 形式）を抽出する。"""
+    """DataFrame から時系列を表す列名を抽出する。
+
+    対応形式:
+      - 月単位:  YYYY_MM           (例: 2011_04)
+      - 日単位:  YYYY_MM_DD        (例: 2011_04_24)
+      - 時単位:  YYYY_MM_DD_HH     (例: 2011_04_24_12)
+      - 分単位:  YYYY_MM_DD_HH_MM  (例: 2011_04_24_12_16)
+    """
     import re
-    return [
-        col for col in df.columns
-        if re.match(r"^\d{4}_\d{2}$", col)
-    ]
+    pattern = re.compile(r"^\d{4}(?:_\d{2}){1,4}$")
+    return [col for col in df.columns if pattern.match(col)]
 
 
 def period_to_label(period: str) -> str:
-    """'2011_04' → '2011年4月' に変換する。"""
-    year, month = period.split("_")
-    return f"{year}年{int(month):d}月"
+    """期間カラム名を日本語ラベルに変換する。
+
+    例:
+      '2011_04'             → '2011年4月'
+      '2011_04_24'          → '2011年4月24日'
+      '2011_04_24_12'       → '2011年4月24日 12時'
+      '2011_04_24_12_16'    → '2011年4月24日 12:16'
+    """
+    parts = period.split("_")
+    year = parts[0]
+    if len(parts) == 2:
+        return f"{year}年{int(parts[1]):d}月"
+    if len(parts) == 3:
+        return f"{year}年{int(parts[1]):d}月{int(parts[2]):d}日"
+    if len(parts) == 4:
+        return f"{year}年{int(parts[1]):d}月{int(parts[2]):d}日 {int(parts[3]):d}時"
+    if len(parts) == 5:
+        return (
+            f"{year}年{int(parts[1]):d}月{int(parts[2]):d}日 "
+            f"{int(parts[3]):02d}:{int(parts[4]):02d}"
+        )
+    return period
 
 
 def save_single_frame(
@@ -81,10 +105,12 @@ def save_single_frame(
         vmax=vmax,
         cmap_name=config.cmap_name,
         reverse_colors=config.reverse_colors,
+        norm_type=config.norm_type,
         output_path=frame_path,
         prefecture=prefecture,
         show_points=show_points,
         show_labels=show_labels,
+        show_cell_borders=config.show_cell_borders,
     )
     try:
         use_case.execute(command)

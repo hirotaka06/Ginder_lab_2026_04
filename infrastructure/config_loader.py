@@ -17,17 +17,23 @@ class MapConfig:
     """config.py から読み込んだ描画設定。
 
     Attributes:
-        title:          グラフタイトル。省略時は main.py 側で日付を付与する。
-        colorbar_label: カラーバーのラベル。
-        cmap_name:      matplotlibカラーマップ名。
-        reverse_colors: True のとき色順を逆転（高い値ほど薄い色）。
-        thresholds:     閾値と凡例ラベルのリスト（値の昇順で記述する）。
+        title:              グラフタイトル。省略時は main.py 側で日付を付与する。
+        colorbar_label:     カラーバーのラベル。
+        cmap_name:          matplotlibカラーマップ名（カスタム名 'safecast' も可）。
+        reverse_colors:     True のとき色順を逆転（高い値ほど薄い色）。
+        norm_type:          色の正規化方式。'linear' または 'log'。
+                            'log' のとき、最小閾値 (thresholds[0].value) は 0 より大きい必要がある。
+        show_cell_borders:  True のときボロノイセルの間に白い境界線を描く（デフォルト）。
+                            False にするとセル同士が地続きの面塗りになる。
+        thresholds:         閾値と凡例ラベルのリスト（値の昇順で記述する）。
     """
 
     title: str | None = None
     colorbar_label: str = "計測値"
     cmap_name: str = "YlOrRd"
     reverse_colors: bool = False
+    norm_type: str = "linear"
+    show_cell_borders: bool = True
     thresholds: list[ThresholdEntry] = field(default_factory=list)
 
 
@@ -52,6 +58,8 @@ def load_map_config(config_path: str) -> MapConfig:
         colorbar_label=_get_str(module, "colorbar_label", default="計測値"),
         cmap_name=_get_str(module, "cmap_name", default="YlOrRd"),
         reverse_colors=bool(getattr(module, "reverse_colors", False)),
+        norm_type=_get_norm_type(module),
+        show_cell_borders=bool(getattr(module, "show_cell_borders", True)),
         thresholds=thresholds,
     )
 
@@ -80,6 +88,21 @@ def _get_optional_str(module: ModuleType, name: str) -> str | None:
     value = getattr(module, name, None)
     if value is not None and not isinstance(value, str):
         raise ConfigLoadError(f"{name} は文字列で指定してください。")
+    return value
+
+
+_VALID_NORM_TYPES = ("linear", "log")
+
+
+def _get_norm_type(module: ModuleType) -> str:
+    """norm_type を読み取り、'linear' または 'log' に正規化する。"""
+    value = getattr(module, "norm_type", "linear")
+    if not isinstance(value, str):
+        raise ConfigLoadError("norm_type は文字列で指定してください。")
+    if value not in _VALID_NORM_TYPES:
+        raise ConfigLoadError(
+            f"norm_type は {_VALID_NORM_TYPES} のいずれかを指定してください: {value!r}"
+        )
     return value
 
 

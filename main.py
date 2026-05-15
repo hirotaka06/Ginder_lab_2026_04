@@ -99,10 +99,12 @@ def main() -> None:
         vmax=vmax,
         cmap_name=config.cmap_name,
         reverse_colors=config.reverse_colors,
+        norm_type=config.norm_type,
         output_path=output_path,
         prefecture=args.prefecture,
         show_points=not args.no_points,
         show_labels=not args.no_labels,
+        show_cell_borders=config.show_cell_borders,
     )
 
     try:
